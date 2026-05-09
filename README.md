@@ -12,7 +12,13 @@ PortGrid opens a dedicated tmux session followed by a window for every project y
 
 ## Install
 
-TODO
+```sh
+# Setup the tap
+brew tap justintime50/formulas
+
+# Install portgrid
+brew install portgrid
+```
 
 ## Usage
 

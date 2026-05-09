@@ -22,7 +22,7 @@ brew install portgrid
 
 ## Usage
 
-Store all the repos you want your code ported to in the `parent_dir`, write a prompt to shape how your agent will port your code (see example), and optionally specify which agent to use (`claude` - default, or `copilot`).
+Store all the repos you want your code ported to in the `parent_dir`, write a prompt to shape how your agent will port your code (see [prompt_example.md](prompt_example.md)), and optionally specify which agent to use (`claude` or `copilot`).
 
 ```sh
 # Basic Usage

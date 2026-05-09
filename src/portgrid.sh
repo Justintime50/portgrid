@@ -2,7 +2,8 @@
 
 # An agentic harness for Claude or Copilot to port code from one project to another.
 
-SESSION_NAME="portgrid"
+SESSION_NAME_BASE="portgrid"
+SESSION_NAME="$SESSION_NAME_BASE"
 PARENT_DIR="$1"
 PROMPT_FILE="$2"
 AGENT_CMD="${3:-claude}"
@@ -47,11 +48,17 @@ fi
 
 # Check if tmux session already exists
 if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+    echo "Warning: tmux session '$SESSION_NAME' already exists."
     while true; do
-        read -r -p "Tmux session '$SESSION_NAME' already exists. Restart it? [y/N]: " restart
-        case "$restart" in
+        read -r -p "Create a new session with an incremented name? [y/N]: " create_new
+        case "$create_new" in
         [yY] | [yY][eE][sS])
-            tmux kill-session -t "$SESSION_NAME"
+            suffix=1
+            while tmux has-session -t "${SESSION_NAME_BASE}${suffix}" 2>/dev/null; do
+                ((suffix++))
+            done
+            SESSION_NAME="${SESSION_NAME_BASE}${suffix}"
+            echo "Using new session '$SESSION_NAME'."
             break
             ;;
         [nN] | [nN][oO] | "")

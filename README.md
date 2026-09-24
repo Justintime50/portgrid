@@ -31,7 +31,3 @@ portgrid path/to/parent_dir path/to/prompt.md <agent>
 # Agents accept params
 portgrid path/to/parent_dir path/to/prompt.md 'copilot --model gpt-4.1 --yolo'
 ```
-
-## Known Issues
-
-Copilot startup is incredibly slow compared to Claude, to combat that, we inject the prompt with a delayed timer to ensure Copilot is ready to receive the input. If using Copilot, you will notice a delay in the agents initial response due to this.

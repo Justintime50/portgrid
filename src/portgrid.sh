@@ -9,6 +9,11 @@ PROMPT_FILE="$2"
 AGENT_CMD="${3:-claude}"
 AGENT_BIN="${AGENT_CMD%% *}"
 
+# Copilot startup wait tuning (override via environment variables)
+PORTGRID_WAIT_TIMEOUT_SEC="${PORTGRID_WAIT_TIMEOUT_SEC:-20}"
+PORTGRID_WAIT_INTERVAL_SEC="${PORTGRID_WAIT_INTERVAL_SEC:-0.25}"
+PORTGRID_READY_STABLE_POLLS=3
+
 # Usage information
 if [ $# -lt 2 ]; then
     echo "Usage: $0 <parent_directory> <prompt_file> [agent_command]"
@@ -75,16 +80,58 @@ fi
 # Get absolute path of prompt file
 PROMPT_FILE="$(cd "$(dirname "$PROMPT_FILE")" && pwd)/$(basename "$PROMPT_FILE")"
 
+# Wait for Copilot pane output to show the prompt and settle before injecting prompt text.
+send_prompt_when_copilot_ready() {
+    local target="$1"
+    local max_checks stable_count checks pane_snapshot last_snapshot
+
+    max_checks=$(awk "BEGIN { print int(($PORTGRID_WAIT_TIMEOUT_SEC / $PORTGRID_WAIT_INTERVAL_SEC) + 0.5) }")
+    if [ "$max_checks" -lt 1 ]; then
+        max_checks=1
+    fi
+
+    stable_count=0
+    checks=0
+    last_snapshot=""
+
+    while [ "$checks" -lt "$max_checks" ]; do
+        pane_snapshot="$(tmux capture-pane -p -t "$target" -S -30 2>/dev/null || true)"
+
+        if printf '%s\n' "$pane_snapshot" | grep -Fq "Copilot"; then
+            if [ "$pane_snapshot" = "$last_snapshot" ]; then
+                ((stable_count++))
+            else
+                stable_count=0
+                last_snapshot="$pane_snapshot"
+            fi
+
+            if [ "$stable_count" -ge "$PORTGRID_READY_STABLE_POLLS" ]; then
+                break
+            fi
+        else
+            stable_count=0
+            last_snapshot=""
+        fi
+
+        sleep "$PORTGRID_WAIT_INTERVAL_SEC"
+        ((checks++))
+    done
+
+    tmux load-buffer "$PROMPT_FILE"
+    tmux paste-buffer -t "$target"
+    tmux send-keys -t "$target" C-m
+}
+
 # Launch agent in a window.
 # Claude uses piped prompt input.
-# Copilot does not accept piped prompt input, so we start it interactively, then send prompt content via delayed tmux paste-buffer.
+# Copilot does not accept piped prompt input, so we start it interactively, then paste prompt content after the pane is ready.
 launch_agent_in_window() {
     local target="$1"
     local repo_dir="$2"
 
     if [ "$AGENT_BIN" = "copilot" ]; then
         tmux send-keys -t "$target" "cd \"$repo_dir\" && $AGENT_CMD" C-m
-        tmux run-shell -b "sleep 4; tmux load-buffer \"$PROMPT_FILE\"; tmux paste-buffer -t \"$target\"; tmux send-keys -t \"$target\" C-m"
+        send_prompt_when_copilot_ready "$target" &
     else
         tmux send-keys -t "$target" "cd \"$repo_dir\" && cat \"$PROMPT_FILE\" | $AGENT_CMD" C-m
     fi
